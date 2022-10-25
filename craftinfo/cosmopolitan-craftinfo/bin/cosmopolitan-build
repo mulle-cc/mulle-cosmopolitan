@@ -1,0 +1,452 @@
+#! /usr/bin/env mulle-bash
+# shellcheck shell=bash
+
+[ "${TRACE}" = 'YES' -o "${MULLE_BUILD_SH_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
+MULLE_EXECUTABLE_VERSION="0.0.1"
+
+
+#
+# This is an example build script. Build scripts can be useful, if the
+# project is based on make or some other non-mulle-make-supported build system.
+#
+# Rename it to `cosmopolitan-build` or `cosmopolitan-build.linux`, 
+# if its just applicable to linux. 
+#
+# Enable it with:
+#    mulle-sde dependency craftinfo --os linux \
+#                   set <dependency> BUILD_SCRIPT cosmopolitan-build.linux
+#
+# Enable scripts with:
+#    mulle-sde environment set MULLE_SDE_ALLOW_BUILD_SCRIPT 'YES'
+#
+# Hint: If this gets too complicated and you are tempted to massage the
+#       Makefile, maybe it's easier to use the dependency as an embedded 
+#       dependency and compile the sources yourself with cmake ?
+#
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+   cat <<EOF >&2
+Usage:
+   ${MULLE_USAGE_NAME} [flags] [command] [options]
+
+   Script to build cosmopolitan.
+
+Flags:
+EOF
+
+   options_technical_flags_usage "      : " >&2
+
+   cat <<EOF >&2
+
+Commands:
+   install : build and install [default]
+   build   : just build
+   version : script version
+EOF
+
+   exit 1
+}
+
+
+r_cosmopolitan_mode_for_configuration()
+{
+   local configuration="$1"
+
+   case "${configuration}" in
+      Debug)
+         RVAL=   # dbg doesn't build for me
+      ;;
+
+      RelDebug)
+         RVAL=
+      ;;
+
+      Release)
+         RVAL=rel
+      ;;
+
+      *)
+         RVAL=
+      ;;
+   esac
+
+}
+
+build_main()
+{
+   log_entry "build_main" "$@"
+
+   #
+   # cosmopolitan can't redirect, so we just symlink everything except the 'o'
+   # folder over, this way we can clean stuff up
+   #
+   mkdir_if_missing "${KITCHEN_DIR}"
+
+   local file
+
+   for file in *
+   do
+      case "${file}" in
+         o)
+         ;;
+
+         *)
+            r_absolutepath "${file}"
+            ( cd "${KITCHEN_DIR}" && create_symlink "${RVAL}" "${file}" ) || exit 1
+         ;;
+      esac
+   done
+
+   local mode
+
+   r_cosmopolitan_mode_for_configuration "${CONFIGURATION}"
+   mode="${RVAL}"
+
+   (
+      cd ${KITCHEN_DIR}  &&
+      logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
+                                ./build/bootstrap/make.com m="${mode}"
+   )
+
+   # some tests fail (expectedly it seems) so the return value is trash
+   # sigh
+   return 0
+}
+
+
+clean_main()
+{
+   log_entry "clean_main" "$@"
+
+   [ ! -d "${KITCHEN_DIR}/o" ] || rm -rf "${KITCHEN_DIR}/o"
+}
+
+
+# https://en.cppreference.com/w/c/header
+STANDARD_HEADERS="assert.h
+complex.h
+ctype.h
+errno.h
+fenv.h
+float.h
+inttypes.h
+iso646.h
+limits.h
+locale.h
+math.h
+setjmp.h
+signal.h
+stdarg.h
+stdatomic.h
+stdbit.h
+stdbool.h
+stdckdint.h
+stddef.h
+stdint.h
+stdio.h
+stdlib.h
+stdnoreturn.h
+string.h
+strings.h
+tgmath.h
+time.h
+uchar.h
+wchar.h
+wctype.h"
+
+# cosmopolitan 2.1.1 doesn't support that:
+# threads.h
+# stdalign.h
+
+
+OTHER_HEADERS="alloca.h
+dirent.h
+dlfcn.h
+endian.h
+fcntl.h
+iconv.h
+langinfo.h
+pthread.h
+netdb.h
+unistd.h"
+
+
+SYS_HEADERS="sys/dir.h
+sys/select.h
+sys/time.h
+sys/types.h
+sys/stat.h
+sys/socket.h
+sys/syslog.h
+sys/wait.h"
+
+NETINET_HEADERS="netinet/in.h
+netinet/ip.h
+netinet/ip6.h
+netinet/udp.h
+netinet/tcp.h"
+
+COMMON_LIBS="libdl.a
+libm.a
+libpthread.a"
+
+
+install_main()
+{
+   log_entry "install_main" "$@"
+
+   if ! build_main "$@"
+   then
+      fail "Build failed, not installing..."
+   fi
+
+   local mode
+
+   r_cosmopolitan_mode_for_configuration "${CONFIGURATION}"
+   mode="${RVAL}"
+
+   logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
+      mkdir -p "${PREFIX}/include/cosmopolitan"
+
+   # header is modeless
+   logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
+      cp "${KITCHEN_DIR}/o/cosmopolitan.h" "${PREFIX}/include/cosmopolitan" || exit 1
+
+   # -T,ape.lds -include cosmopolitan.h crt.o ape-no-modify-self.o cosmopolitan.a
+   logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
+      mkdir -p "${PREFIX}/lib"
+   logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
+      cp "${KITCHEN_DIR}/o/${mode}/cosmopolitan.a" "${PREFIX}/lib/cosmopolitan.a" || exit 1
+
+   logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
+      cp "${KITCHEN_DIR}/o/${mode}/libc/crt/crt.o" "${PREFIX}/lib/crt.o" || exit 1
+   logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
+      cp "${KITCHEN_DIR}/o/${mode}/ape/ape-no-modify-self.o" "${PREFIX}/lib/ape-no-modify-self.o" || exit 1
+   logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
+      cp "${KITCHEN_DIR}/o/${mode}/ape/ape.lds" "${PREFIX}/lib/ape.lds" || exit 1
+
+   mkdir_if_missing "${PREFIX}/include"
+   # create a lot of symlinks to lib/cosmopolitan.h for C std libraries
+   (
+      cd ${PREFIX}/include
+      for header in ${STANDARD_HEADERS} ${OTHER_HEADERS}
+      do
+         cat > "${header}" <<EOF
+#ifndef COSMOPOLITAN_H_
+# include <cosmopolitan/cosmopolitan.h>
+#endif
+EOF
+      done
+   )
+
+   # fix stdalign.h
+   (
+      cd ${PREFIX}/include
+      cat > "stdalign.h" <<EOF
+#ifndef alignof
+# define alignof( x)    _Alignof( x)
+# define alignas( x)    _Alignas( x)
+#endif
+EOF
+   )
+
+   # create some common sys header symlinks
+   (
+      logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
+         mkdir -p "${PREFIX}/include/sys"
+
+      cd ${PREFIX}/include  # not sys
+      for header in ${SYS_HEADERS}
+      do
+         cat > "${header}" <<EOF
+#ifndef COSMOPOLITAN_H_
+# include <cosmopolitan/cosmopolitan.h>
+#endif
+EOF
+      done
+   )
+
+   # create some common net header symlinks
+   (
+      logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
+         mkdir -p "${PREFIX}/include/netinet"
+
+      cd ${PREFIX}/include  # not netinet
+
+      for header in ${NETINET_HEADERS}
+      do
+         cat > "${header}" <<EOF
+#ifndef COSMOPOLITAN_H_
+# include <cosmopolitan/cosmopolitan.h>
+#endif
+EOF
+      done
+   )
+
+   mkdir_if_missing "${PREFIX}/lib"
+
+   # fake some libraries, which one would expect
+   (
+      cd "${PREFIX}/lib"
+
+      echo "" | cc -c -o empty.o -x c -
+
+      for lib in ${COMMON_LIBS}
+      do
+         ar r "${lib}" empty.o
+         if [ -v "`command -v ranlib `" ]
+         then
+            ranlib "${lib}"
+         fi
+      done
+   )
+}
+
+
+main()
+{
+   local CONFIGURATION="Debug"
+   local SDK=""
+   local PREFIX="/tmp"
+   local KITCHEN_DIR="kitchen"
+   local LOGFILE
+   local TEEFILE
+   local TARGET
+
+   while [ "$#" -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -h*|--help|help)
+            usage
+         ;;
+
+         --logfile)
+            [ $# -eq 1 ] && fail "Missing argument to \"$1\""
+            shift
+
+            LOGFILE="$1"
+         ;;
+
+         --teefile)
+            [ $# -eq 1 ] && fail "Missing argument to \"$1\""
+            shift
+
+            TEEFILE="$1"
+         ;;
+
+         --sdk)
+            [ $# -eq 1 ] && fail "Missing argument to \"$1\""
+            shift
+
+            SDK="$1"
+         ;;
+
+         --configuration)
+            [ $# -eq 1 ] && fail "Missing argument to \"$1\""
+            shift
+
+            CONFIGURATION="$1"
+         ;;
+
+         --kitchen-dir|--build-dir)
+            [ $# -eq 1 ] && fail "Missing argument to \"$1\""
+            shift
+
+            KITCHEN_DIR="$1"
+         ;;
+
+         --platform)
+            [ $# -eq 1 ] && fail "Missing argument to \"$1\""
+            shift
+
+            PLATFORM="$1"
+         ;;
+
+         --prefix|--install-dir)
+            [ $# -eq 1 ] && fail "Missing argument to \"$1\""
+            shift
+
+            PREFIX="$1"
+         ;;
+
+         --target)
+            [ $# -eq 1 ] && fail "Missing argument to \"$1\""
+            shift
+
+            TARGET="$1"
+         ;;
+
+         --*)
+            log_warning "Ignoring unknown option $1 $2"
+            shift
+         ;;
+
+         -*)
+            log_warning "Ignoring unknown option $1"
+            shift
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   if [ -z "${TEEFILE}" ]
+   then
+      if [ "${MULLE_FLAG_LOG_VERBOSE}" ]
+      then
+         TEEFILE="/dev/stderr"
+      else
+         TEEFILE="/dev/null"
+      fi
+   fi
+
+   if [ -z "${LOGFILE}" ]
+   then
+      LOGFILE="/dev/null"
+   fi
+
+   # see with -ls
+   log_setting "CONFIGURATION = \"${CONFIGURATION}\""
+   log_setting "KITCHEN_DIR   = \"${KITCHEN_DIR}\""
+   log_setting "PLATFORM      = \"${PLATFORM}\""
+   log_setting "PREFIX        = \"${PREFIX}\""
+   log_setting "PWD           = \"${PWD}\""
+   log_setting "SDK           = \"${SDK}\""
+   log_setting "TEEFILE       = \"${TEEFILE}\""
+   log_setting "LOGFILE       = \"${LOGFILE}\""
+
+   local cmd
+
+   cmd="${1:-install}"
+
+   case "${cmd}" in
+      build|install|clean)
+         ${cmd}_main "$@"
+      ;;
+
+      *)
+         usage "Unknown command \"${cmd}\""
+      ;;
+   esac
+}
+
+
+main "$@"

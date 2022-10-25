@@ -1,0 +1,17 @@
+build/
+var/
+.mulle-make-build-dir
+version.old
+.gdb_history
+stash
+kitchen
+dependency/
+.ackrc
+.mulle/var
+demo/.mulle/var
+demo-objc.broken/
+demo.orig/
+*.o
+*.com
+
+demo/hello

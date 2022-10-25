@@ -1,0 +1,42 @@
+#! /bin/sh -x
+
+c_file="${1:-/home/src/srcO/mulle-cc/mulle-cosmopolitan/demo-c/src/main-cas.c}"
+
+gcc                                          \
+   -static                                   \
+   -nostdinc                                 \
+   -nostdlib                                 \
+   -D__MULLE_COSMOPOLITAN__                  \
+   -D__MULLE_STATICALLY_LINKED__             \
+   -D__STDC_NO_THREADS__                     \
+   -isysroot ./dependency                    \
+   -isystem ./dependency/include             \
+   -fno-pie                                  \
+   -fno-omit-frame-pointer                   \
+   -gdwarf-4                                 \
+   -mno-red-zone                             \
+   -mno-tls-direct-seg-refs                  \
+   -DCAS_BUILD                               \
+   -DDEBUG                                   \
+   -DTRACE_INCLUDE                           \
+   -Wno-parentheses                          \
+   -g                                        \
+   -MD                                       \
+   -o main-cas.o                             \
+   -c "${c_file}" \
+&&
+gcc                                          \
+   -nostdlib                                 \
+   -no-pie                                   \
+   -g                                        \
+   -gdwarf-4                                 \
+   -fuse-ld=bfd                              \
+   -Wl,-T,./dependency/lib/ape.lds           \
+   -Wl,--gc-sections                         \
+   -o cas.dbg                                \
+   main-cas.o                                \
+   -Wl,./dependency/lib/crt.o                \
+   -Wl,./dependency/lib/ape-no-modify-self.o \
+   -Wl,./dependency/lib/cosmopolitan.a       \
+&&
+   objcopy -S -O binary "cas.dbg" "cas-manual"
