@@ -20,20 +20,20 @@ will use `/usr/local` as `DEPENDENCY_DIR`)
 > #### Note
 >
 > Does not work with the mulle-clang compiler (sometimes) for unknown reasons.
-> Everything builds but the executable errors with an alignment error.
+> Everything builds but the executable errors with an alignment error:
+> `APE phdrs must be 4096-aligned and 4096-padded`
 
-## Add mulle-musl-cc to your mulle-sde project
+## Add mulle-cosmopolitan to your mulle-sde project
 
-Add `mulle-cosmopolitan` and `mulle-cosmopolitan` as dependencies and set
-`gcc.cosmopolitan` as your `CC`:
+Add `mulle-cosmopolitan-cc` and `mulle-cosmopolitan` as dependencies. It is
+intended that you set `cosmopolitan` as your `MULLE_CRAFT_SDKS` environment variable:
 
 ``` sh
-mulle-sde dependency add --marks no-header,no-link --github mulle-cc mulle-cosmopolitan
-mulle-sde dependency add --marks no-header,no-link --github mulle-cc mulle-cosmopolitan-cc
-mulle-sde environment set CC mulle-gcc.cosmopolitan
-mulle-sde environment CMAKEFLAGS="-DMULLE_NO_CMAKE_INSTALL_RPATH:BOOL=ON -DCOSMOPOLITAN:BOOL=ON"
+mulle-sde dependency add --marks no-header,no-link,only-craft-sdk-cosmopolitan --github mulle-cc mulle-cosmopolitan
+mulle-sde dependency add --marks no-header,no-link,only-craft-sdk-cosmopolitan --github mulle-cc mulle-cosmopolitan-cc
 mulle-sde dependency move mulle-cosmopolitan-cc top
 mulle-sde dependency move mulle-cosmopolitan top
+mulle-sde env --global set --append MULLE_CRAFT_SDKS cosmopolitan
 ```
 
 ## Dependency setup

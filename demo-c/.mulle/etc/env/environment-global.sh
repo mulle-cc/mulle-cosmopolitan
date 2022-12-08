@@ -1,7 +1,7 @@
 #
 #
 #
-export CC="gcc.cosmopolitan"
+export CC="mulle-clang.cosmopolitan"
 
 
 #

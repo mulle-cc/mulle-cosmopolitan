@@ -11,5 +11,6 @@ endif()
 # contents selected with patternfile ??-source--sources
 #
 set( SOURCES
+src/main-cas.c
 src/main-demo1.c
 )

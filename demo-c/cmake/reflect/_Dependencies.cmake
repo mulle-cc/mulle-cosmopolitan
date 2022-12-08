@@ -15,6 +15,7 @@ endif()
 # Generated from sourcetree: 9735A1A3-F703-4A44-B070-E51169D20327;mulle-fprintf;no-cmake-loader,no-cmake-searchpath,no-import,no-singlephase;
 # Disable with : `mulle-sourcetree mark mulle-fprintf no-link`
 # Disable for this platform: `mulle-sourcetree mark mulle-fprintf no-cmake-platform-${MULLE_UNAME}`
+# Disable for a sdk: `mulle-sourcetree mark mulle-fprintf no-cmake-sdk-<name>`
 #
 if( NOT MULLE_FPRINTF_LIBRARY)
    find_library( MULLE_FPRINTF_LIBRARY NAMES ${CMAKE_STATIC_LIBRARY_PREFIX}mulle-fprintf${CMAKE_DEBUG_POSTFIX}${CMAKE_STATIC_LIBRARY_SUFFIX} ${CMAKE_STATIC_LIBRARY_PREFIX}mulle-fprintf${CMAKE_STATIC_LIBRARY_SUFFIX} mulle-fprintf NO_CMAKE_SYSTEM_PATH NO_SYSTEM_ENVIRONMENT_PATH)
@@ -86,6 +87,7 @@ endif()
 # Generated from sourcetree: 24D6B628-91A4-4186-895D-567A862F8BF6;mulle-objc-runtime;no-cmake-loader,no-cmake-searchpath,no-import;
 # Disable with : `mulle-sourcetree mark mulle-objc-runtime no-link`
 # Disable for this platform: `mulle-sourcetree mark mulle-objc-runtime no-cmake-platform-${MULLE_UNAME}`
+# Disable for a sdk: `mulle-sourcetree mark mulle-objc-runtime no-cmake-sdk-<name>`
 #
 if( NOT MULLE_OBJC_RUNTIME_LIBRARY)
    find_library( MULLE_OBJC_RUNTIME_LIBRARY NAMES ${CMAKE_STATIC_LIBRARY_PREFIX}mulle-objc-runtime${CMAKE_DEBUG_POSTFIX}${CMAKE_STATIC_LIBRARY_SUFFIX} ${CMAKE_STATIC_LIBRARY_PREFIX}mulle-objc-runtime${CMAKE_STATIC_LIBRARY_SUFFIX} mulle-objc-runtime NO_CMAKE_SYSTEM_PATH NO_SYSTEM_ENVIRONMENT_PATH)
