@@ -8,7 +8,7 @@
    "license" : "UNLICENSED",
    "repository" : {
       "type" : "git",
-      "url" : "mulle-c/mulle-cosmopolitan"
+      "url" : "github:mulle-c/mulle-cosmopolitan"
    },
    "dependencies" : {
       "cosmopolitan" : "git://github.com/jart/cosmopolitan#semver:^2.2"
