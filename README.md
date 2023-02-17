@@ -1,6 +1,6 @@
 # mulle-cosmopolitan
 
-**EXPERIMENTAL**
+**NOT RECOMMENDED AND POTENTIALLY HARMFUL UNTIL THIS [ISSUE](https://github.com/jart/cosmopolitan/issues/743) HAS BEEN RESOLVED**
 
 #### ⛺ mulle-cosmopolitan support for mulle-c
 
