@@ -108,8 +108,9 @@ build_main()
    r_cosmopolitan_mode_for_configuration "${CONFIGURATION}"
    mode="${RVAL}"
 
+   log_info "Running cosmopolitan bootstrap"
    (
-      cd ${KITCHEN_DIR}  &&
+      rexekutor cd ${KITCHEN_DIR}  &&
       logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
                                 ./build/bootstrap/make.com m="${mode}"
    )
@@ -124,7 +125,7 @@ clean_main()
 {
    log_entry "clean_main" "$@"
 
-   [ ! -d "${KITCHEN_DIR}/o" ] || rm -rf "${KITCHEN_DIR}/o"
+   [ ! -d "${KITCHEN_DIR}/o" ] || exekutor rm -rf "${KITCHEN_DIR}/o"
 }
 
 
@@ -234,10 +235,10 @@ install_main()
    mkdir_if_missing "${PREFIX}/include"
    # create a lot of symlinks to lib/cosmopolitan.h for C std libraries
    (
-      cd ${PREFIX}/include
+      rexekutor cd "${PREFIX}/include"
       for header in ${STANDARD_HEADERS} ${OTHER_HEADERS}
       do
-         cat > "${header}" <<EOF
+         redirect_exekutor "${header}" cat <<EOF
 #ifndef COSMOPOLITAN_H_
 # include <cosmopolitan/cosmopolitan.h>
 #endif
@@ -247,8 +248,8 @@ EOF
 
    # fix stdalign.h
    (
-      cd ${PREFIX}/include
-      cat > "stdalign.h" <<EOF
+      rexekutor cd "${PREFIX}/include"
+      redirect_exekutor "stdalign.h" cat <<EOF
 #ifndef alignof
 # define alignof( x)    _Alignof( x)
 # define alignas( x)    _Alignas( x)
@@ -261,10 +262,10 @@ EOF
       logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
          mkdir -p "${PREFIX}/include/sys"
 
-      cd ${PREFIX}/include  # not sys
+      rexekutor "cd ${PREFIX}/include"  # not sys
       for header in ${SYS_HEADERS}
       do
-         cat > "${header}" <<EOF
+         redirect_exekutor"${header}" cat <<EOF
 #ifndef COSMOPOLITAN_H_
 # include <cosmopolitan/cosmopolitan.h>
 #endif
@@ -277,11 +278,11 @@ EOF
       logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
          mkdir -p "${PREFIX}/include/netinet"
 
-      cd ${PREFIX}/include  # not netinet
+      rexekutor cd "${PREFIX}/include"  # not netinet
 
       for header in ${NETINET_HEADERS}
       do
-         cat > "${header}" <<EOF
+         redirect_exekutor "${header}" cat <<EOF
 #ifndef COSMOPOLITAN_H_
 # include <cosmopolitan/cosmopolitan.h>
 #endif
@@ -293,16 +294,16 @@ EOF
 
    # fake some libraries, which one would expect
    (
-      cd "${PREFIX}/lib"
+      rexekutor cd "${PREFIX}/lib"
 
-      echo "" | cc -c -o empty.o -x c -
+      rexekutor echo "" | exekutor cc -c -o empty.o -x c -
 
       for lib in ${COMMON_LIBS}
       do
-         ar r "${lib}" empty.o
+         exekutor ar r "${lib}" empty.o
          if [ -v "`command -v ranlib `" ]
          then
-            ranlib "${lib}"
+            exekutor ranlib "${lib}"
          fi
       done
    )
@@ -358,6 +359,13 @@ main()
             shift
 
             CONFIGURATION="$1"
+         ;;
+
+         --root-dir)
+            [ $# -eq 1 ] && fail "Missing argument to \"$1\""
+            shift
+
+            ROOT_DIR="$1"
          ;;
 
          --kitchen-dir|--build-dir)
@@ -426,6 +434,7 @@ main()
    # see with -ls
    log_setting "CONFIGURATION = \"${CONFIGURATION}\""
    log_setting "KITCHEN_DIR   = \"${KITCHEN_DIR}\""
+   log_setting "ROOT_DIR      = \"${ROOT_DIR}\""
    log_setting "PLATFORM      = \"${PLATFORM}\""
    log_setting "PREFIX        = \"${PREFIX}\""
    log_setting "PWD           = \"${PWD}\""
