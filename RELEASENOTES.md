@@ -1,3 +1,7 @@
+### 0.0.4
+
+* support for cosmopolitan 3.2.4
+
 ### 0.0.3
 
 * remove package.json as it conflicts with clib.json
