@@ -60,19 +60,19 @@ r_cosmopolitan_mode_for_configuration()
 
    case "${configuration}" in
       Debug)
-         RVAL=   # dbg doesn't build for me
+         RVAL=dbg   # dbg doesn't build for me
       ;;
 
       RelDebug)
-         RVAL=
+         RVAL=asan
       ;;
 
       Release)
-         RVAL=rel
+         RVAL=tiny
       ;;
 
       *)
-         RVAL=
+         RVAL=tiny
       ;;
    esac
 
@@ -108,16 +108,67 @@ build_main()
    r_cosmopolitan_mode_for_configuration "${CONFIGURATION}"
    mode="${RVAL}"
 
-   log_info "Running cosmopolitan bootstrap"
-   (
-      rexekutor cd ${KITCHEN_DIR}  &&
-      logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
-                                ./build/bootstrap/make.com m="${mode}"
-   )
+   local cores
+   local arguments
 
-   # some tests fail (expectedly it seems) so the return value is trash
-   # sigh
-   return 0
+   if [ -z "${CORES}" ]
+   then
+      include "parallel"
+
+      r_get_core_count
+      cores=${MULLE_CORES}
+   else
+      cores="${CORES}"
+   fi
+
+   if [ "${cores:-0}" -gt 0 ]
+   then
+      r_concat "${arguments}" "-j ${cores}"
+      arguments="${RVAL}"
+   fi
+
+   # ./build/bootstrap/make.com
+   # log_info "Running cosmopolitan bootstrap"
+   # we only build the libc library
+   # see: https://github.com/jart/cosmopolitan/blob/master/tool/cosmocc/package.sh
+   # for clues
+   log_info "Running make on cosmopolitan"
+   (
+      rexekutor cd "${KITCHEN_DIR}"  &&
+      logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
+                                make ${arguments} m="${mode}" \
+                                  "o/cosmocc.h.txt" \
+                                  "o/cosmopolitan.h" \
+                                  "o/${mode}/ape/ape.lds" \
+                                  "o/${mode}/libc/crt/crt.o" \
+                                  "o/${mode}/ape/ape.elf" \
+                                  "o/${mode}/ape/ape.macho" \
+                                  "o/${mode}/ape/ape.o" \
+                                  "o/${mode}/ape/ape-copy-self.o" \
+                                  "o/${mode}/ape/ape-no-modify-self.o" \
+                                  "o/${mode}/cosmopolitan.a" \
+                                  "o/${mode}/libc"
+      rval=$?
+      log_verbose "Cosmopolitan make finished ($rval)"
+      exit $rval
+   ) || exit 1
+
+   local OUTDIR
+
+   OUTDIR="${KITCHEN_DIR}/o/${mode}"
+
+   set -e
+
+   log_info "Copying README.md and Headers"
+
+   rexekutor cp "libc/README.md" "${OUTDIR}/"
+
+   mkdir_if_missing "${OUTDIR}/include"
+
+   rexekutor cp -R libc/isystem/* "${OUTDIR}/include/"
+   rexekutor cp -R libc/integral  "${OUTDIR}/include/libc/"
+
+   set +e
 }
 
 
@@ -125,7 +176,14 @@ clean_main()
 {
    log_entry "clean_main" "$@"
 
-   [ ! -d "${KITCHEN_DIR}/o" ] || exekutor rm -rf "${KITCHEN_DIR}/o"
+   log_info "Running clean on cosmopolitan"
+   (
+      rexekutor cd ${KITCHEN_DIR}  &&
+      exekutor make clean
+      rval=$?
+      log_verbose "Cosmopolitan make finished ($rval)"
+      exit $rval
+   )
 }
 
 
@@ -207,6 +265,9 @@ install_main()
       fail "Build failed, not installing..."
    fi
 
+   # error if any of this fails
+   set -e
+
    local mode
 
    r_cosmopolitan_mode_for_configuration "${CONFIGURATION}"
@@ -235,6 +296,8 @@ install_main()
    mkdir_if_missing "${PREFIX}/include"
    # create a lot of symlinks to lib/cosmopolitan.h for C std libraries
    (
+      set -e
+
       rexekutor cd "${PREFIX}/include"
       for header in ${STANDARD_HEADERS} ${OTHER_HEADERS}
       do
@@ -244,10 +307,12 @@ install_main()
 #endif
 EOF
       done
-   )
+   ) || exit 1
 
    # fix stdalign.h
    (
+      set -e
+
       rexekutor cd "${PREFIX}/include"
       redirect_exekutor "stdalign.h" cat <<EOF
 #ifndef alignof
@@ -255,26 +320,30 @@ EOF
 # define alignas( x)    _Alignas( x)
 #endif
 EOF
-   )
+   ) || exit 1
 
    # create some common sys header symlinks
    (
+      set -e
+
       logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
          mkdir -p "${PREFIX}/include/sys"
 
-      rexekutor "cd ${PREFIX}/include"  # not sys
+      rexekutor cd "${PREFIX}/include"  # not sys
       for header in ${SYS_HEADERS}
       do
-         redirect_exekutor"${header}" cat <<EOF
+         redirect_exekutor "${header}" cat <<EOF
 #ifndef COSMOPOLITAN_H_
 # include <cosmopolitan/cosmopolitan.h>
 #endif
 EOF
       done
-   )
+   ) || exit 1
 
    # create some common net header symlinks
    (
+      set -e
+
       logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
          mkdir -p "${PREFIX}/include/netinet"
 
@@ -288,12 +357,14 @@ EOF
 #endif
 EOF
       done
-   )
+   ) || exit 1
 
    mkdir_if_missing "${PREFIX}/lib"
 
    # fake some libraries, which one would expect
    (
+      set -e
+
       rexekutor cd "${PREFIX}/lib"
 
       rexekutor echo "" | exekutor cc -c -o empty.o -x c -
@@ -306,7 +377,9 @@ EOF
             exekutor ranlib "${lib}"
          fi
       done
-   )
+   ) || exit 1
+
+   set +e
 }
 
 
@@ -396,6 +469,14 @@ main()
             TARGET="$1"
          ;;
 
+         --paralell)
+            # ignore
+         ;;
+
+         --serial)
+            CORES=1
+         ;;
+
          --*)
             log_warning "Ignoring unknown option $1 $2"
             shift
@@ -449,6 +530,7 @@ main()
    case "${cmd}" in
       build|install|clean)
          ${cmd}_main "$@"
+         return $?
       ;;
 
       *)

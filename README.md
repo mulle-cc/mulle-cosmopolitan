@@ -1,6 +1,7 @@
 # mulle-cosmopolitan
 
-**NOT RECOMMENDED AND POTENTIALLY HARMFUL UNTIL THIS [ISSUE](https://github.com/jart/cosmopolitan/issues/743) HAS BEEN RESOLVED**
+To test build use `mulle-sde craft craftorder -- --sdk cosmopolitan`
+
 
 #### ⛺ mulle-cosmopolitan support for mulle-c
 
