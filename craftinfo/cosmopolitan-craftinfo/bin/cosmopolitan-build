@@ -8,6 +8,13 @@ MULLE_EXECUTABLE_VERSION="0.0.1"
 
 
 #
+# old cosmopolitan needed a lot of additional code
+#
+
+#define OLD_COSMOPOLITAN  0
+
+
+#
 # This is an example build script. Build scripts can be useful, if the
 # project is based on make or some other non-mulle-make-supported build system.
 #
@@ -127,6 +134,7 @@ build_main()
       arguments="${RVAL}"
    fi
 
+
    # ./build/bootstrap/make.com
    # log_info "Running cosmopolitan bootstrap"
    # we only build the libc library
@@ -134,7 +142,28 @@ build_main()
    # for clues
    log_info "Running make on cosmopolitan"
    (
-      rexekutor cd "${KITCHEN_DIR}"  &&
+      rexekutor cd "${KITCHEN_DIR}"  || exit 1
+
+      log_verbose "Figuring out, if we have local tools available"
+
+      # this is a wart
+      COSMO_VERSION=3.2
+      COSMO_CC=".cosmocc/${COSMO_VERSION}"
+
+      if COSMO_CC_COMPILER="`command -v cosmocc`"
+      then
+         r_dirname "${COSMO_CC_COMPILER}"  # ../..
+         r_dirname "${RVAL}"
+         tmp="${RVAL}"
+
+         log_info "Using cosmocc toolchain found in ${C_REST_BOLD}${tmp}"
+
+         # need to symlink, though stuff is in PATH already for mystery
+         # reasons
+         r_mkdir_parent_if_missing "${COSMO_CC}"
+         ln -sf "${tmp}" "${RVAL}/${COSMO_VERSION}"
+      fi
+
       logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
                                 make ${arguments} m="${mode}" \
                                   "o/cosmocc.h.txt" \
@@ -159,14 +188,41 @@ build_main()
 
    set -e
 
+   local cpflags
+
+   if [ "${MULLE_FLAG_LOG_VERBOSE}" ]
+   then
+      cpflags="-v"
+   fi
+
    log_info "Copying README.md and Headers"
 
-   rexekutor cp "libc/README.md" "${OUTDIR}/"
+   rexekutor cp ${cpflags} "libc/README.md" "${OUTDIR}/"
 
+   #
+   # monitor this file to see how header are installed:
+   # https://github.com/jart/cosmopolitan/blob/master/tool/cosmocc/package.sh#L76
+   #
    mkdir_if_missing "${OUTDIR}/include"
 
-   rexekutor cp -R libc/isystem/* "${OUTDIR}/include/"
-   rexekutor cp -R libc/integral  "${OUTDIR}/include/libc/"
+   rexekutor cp ${cpflags} -R libc/isystem/* "${OUTDIR}/include/"
+   rexekutor cp ${cpflags} -R libc/integral  "${OUTDIR}/include/libc/"
+
+   local header
+   local dstdir
+   local cosmocc_header
+
+   cosmocc_header="${KITCHEN_DIR}/o/cosmocc.h.txt"
+   [ -f "${cosmocc_header}" ] || fail "${cosmocc_header} not at its expected place"
+
+   for header in $(cat "${cosmocc_header}" ) # sic! not OUTDIR
+   do
+      r_dirname "${header}"
+      dstdir="${OUTDIR}/include/${RVAL}"
+
+      mkdir_if_missing "${dstdir}"
+      rexekutor cp ${cpflags} -f "${header}" "${dstdir}/"
+   done
 
    set +e
 }
@@ -283,6 +339,7 @@ install_main()
    # -T,ape.lds -include cosmopolitan.h crt.o ape-no-modify-self.o cosmopolitan.a
    logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
       mkdir -p "${PREFIX}/lib"
+
    logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
       cp "${KITCHEN_DIR}/o/${mode}/cosmopolitan.a" "${PREFIX}/lib/cosmopolitan.a" || exit 1
 
@@ -293,7 +350,9 @@ install_main()
    logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
       cp "${KITCHEN_DIR}/o/${mode}/ape/ape.lds" "${PREFIX}/lib/ape.lds" || exit 1
 
-   mkdir_if_missing "${PREFIX}/include"
+#if ! OLD_COSMOPOLITAN
+   cp -Ra "${KITCHEN_DIR}/o/${mode}/include" "${PREFIX}"
+#else
    # create a lot of symlinks to lib/cosmopolitan.h for C std libraries
    (
       set -e
@@ -358,6 +417,7 @@ EOF
 EOF
       done
    ) || exit 1
+#endif
 
    mkdir_if_missing "${PREFIX}/lib"
 
