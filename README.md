@@ -1,122 +1,108 @@
-# mulle-cosmopolitan
+# 
 
-To test build use `mulle-sde craft craftorder -- --sdk cosmopolitan`
-
-
-#### ⛺ mulle-cosmopolitan support for mulle-c
-
-mulle-cosmopolitan builds the libc of [cosmopolitan](https://github.com/jart/cosmopolitan)
-and provides custom compilers **mulle-gcc.cosmopolitan** and **mulle-clang.cosmopolitan**
-to build projects that link against this libc. Such executables are supposed to
-be OS independent as long as the platform runs on intel compatible processors.
-
-Other system headers will not be available!
+#### 
 
 
-## Add mulle-cosmopolitan to your mulle-sde project
 
-Add `mulle-cosmopolitan-cc` and `mulle-cosmopolitan` as dependencies. It is
-intended that you set `cosmopolitan` as your `MULLE_CRAFT_SDKS` environment variable:
 
-``` sh
-mulle-sde dependency add --marks no-header,no-link,only-craft-sdk-cosmopolitan --github mulle-cc mulle-cosmopolitan
-mulle-sde dependency add --marks no-header,no-link,only-craft-sdk-cosmopolitan --github mulle-cc mulle-cosmopolitan-cc
-mulle-sde dependency move mulle-cosmopolitan-cc top
-mulle-sde dependency move mulle-cosmopolitan top
-mulle-sde env --global set --append MULLE_CRAFT_SDKS cosmopolitan
-```
 
-## Add cosmo-cc build tools
 
-It's usually convenient to install them somewhere on the system, so that the
-build process does not download the tools every time. *This only works for
-version 3.2, because of some unfortunately hardcoded version number in the
-build script*:
 
+
+
+### You are here
+
+![Overview](overview.dot.svg)
+
+
+
+
+
+## Add
+
+Use [mulle-sde](//github.com/mulle-sde) to add  to your project.
+As long as your sources are using `#include "include-private.h"` and your headers use `#include "include.h"`, there will nothing more to do:
 
 ``` sh
-COSMOCC_VERSION=3.2
-(
-   cd /opt
-   sudo mkdir cosmopolitan
-   sudo chown `id -u` cosmopolitan
-)
-
-url="https://github.com/jart/cosmopolitan/releases/download/${COSMOCC_VERSION}/cosmocc-${COSMOCC_VERSION}.zip"
-dir="/opt/cosmopolitan/"${COSMOCC_VERSION}"
-mulle-fetch -v "${url}" "${dir}"
+mulle-sde add :/
 ```
 
-It is important that you link the installation into a local `addiction`
-directory (in each executable project that you want to build):
+To only add the sources of  with dependency
+sources use [clib](https://github.com/clibs/clib):
+
+## Legacy adds
+
+One common denominator is that you will likely have to add
+`#include </.h>` to your source files.
+
+
+### Add sources to your project with clib
 
 ``` sh
-triple="`arch`-`uname -s | tr '[:upper:]' '[:lower:]'`-cosmo"
-
-mkdir -p "addiction/${triple}"
-(
-	cd addiction
-
-    ln -sf /opt/cosmopolitan/${COSMOCC_VERSION}/bin
-    ln -sf /opt/cosmopolitan/${COSMOCC_VERSION}/include
-    ln -sf /opt/cosmopolitan/${COSMOCC_VERSION}/libexec
-    ln -sf /opt/cosmopolitan/${COSMOCC_VERSION}/${triple}/lib ${triple}/lib
-)
-mulle-sde env set ADDICTION_DIR '${MULLE_VIRTUAL_ROOT}/addiction'
+clib install --out src/ /
 ```
 
-If it's, there the build process will pick it up.
-
-> #### (old note)
->
-> Outside of a mulle-sde environment, you may need to define the environment
-> variable `DEPENDENCY_DIR` that is the root of your `cosmopolitan` installation.
-> If `DEPENDENCY_DIR` is not defined, the compiler will then look for
-> `${MULLE_VIRTUAL_ROOT}/dependency`. If that directory is missing or
-> `MULLE_VIRTUAL_ROOT` is undefined, the compiler will use its grand-parent
-> directory as a fallback. (e.g. `/usr/local/bin/mulle-gcc.cosmopolitan`
-> will use `/usr/local` as `DEPENDENCY_DIR`)
+Add `-isystem src/` to your `CFLAGS` and compile all the
+sources that were downloaded with your project. (In **cmake** add
+`include_directories( BEFORE SYSTEM src/)` to your `CMakeLists.txt`
+file).
 
 
-## Dependency setup
 
-The file structure of the `DEPENDENCY_DIR` as create by **mulle-cosmopolitan**
-is slightly non-standard for a *cosmopolitan* build and will look like this:
 
-```
-├── include
-│   ├── alloca.h
-.....
-│   ├── cosmopolitan
-│   │   └── cosmopolitan.h
-│   ├── ctype.h
-.....
-│   ├── netinet
-│   │   ├── in.h
-.........
-│   │   └── udp.h
-.....
-│   ├── sys
-│   │   ├── dir.h
-........
-│   │   └── wait.h
-.....
-│   └── wctype.h
-├── lib
-│   ├── ape.lds
-│   ├── ape-no-modify-self.o
-│   ├── cosmopolitan.a
-│   ├── crt.o
-│   ├── libdl.a
-│   ├── libm.a
-│   └── libpthread.a
+
+
+
+### Add as subproject with cmake and git
+
+``` bash
+git submodule add -f --name "cosmopolitan" \
+                            "https://github.com/mulle-cc/cosmopolitan/archive/refs.git" \
+                            "stash/cosmopolitan"
+git submodule add -f --name "" \
+                            "https://github.com//" \
+                            "stash/"
+git submodule update --init --recursive
 ```
 
-The `lib<name>.a` libraries are just empty shells, so the linker finds
-something.
+``` cmake
+add_subdirectory( stash/)
+add_subdirectory( stash/cosmopolitan)
+
+target_link_libraries( ${PROJECT_NAME} PUBLIC )
+target_link_libraries( ${PROJECT_NAME} PUBLIC cosmopolitan)
+```
+
+
+## Install
+
+Use [mulle-sde](//github.com/mulle-sde) to build and install :
+
+``` sh
+mulle-sde install --prefix /usr/local \
+   https://github.com///archive/latest.tar.gz
+```
+
+### Legacy Installation
+
+
+Download the latest [tar](https://github.com///archive/refs/tags/latest.tar.gz) or [zip](https://github.com///archive/refs/tags/latest.zip) archive and unpack it.
+
+Install **** into `/usr/local` with [cmake](https://cmake.org):
+
+``` sh
+cmake -B build \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DCMAKE_PREFIX_PATH=/usr/local \
+      -DCMAKE_BUILD_TYPE=Release &&
+cmake --build build --config Release &&
+cmake --install build --config Release
+```
 
 
 ## Author
 
-[Nat!](//www.mulle-kybernetik.com/weblog) for
-[Mulle kybernetiK](//www.mulle-kybernetik.com)
+[Nat!](https://mulle-kybernetik.com/weblog) for Mulle kybernetiK  
+
+
+

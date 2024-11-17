@@ -8,10 +8,11 @@ MULLE_EXECUTABLE_VERSION="0.0.1"
 
 
 #
-# old cosmopolitan needed a lot of additional code
+# old cosmopolitan needs a lot of additional code. Unfortunately cosmopolitan
+# headers are still f*cked and therefore this is necessary. This does pollute
+# the namespace with all headers so...
 #
-
-#define OLD_COSMOPOLITAN  0
+OLD_COSMOPOLITAN='YES'
 
 
 #
@@ -147,7 +148,7 @@ build_main()
       log_verbose "Figuring out, if we have local tools available"
 
       # this is a wart
-      COSMO_VERSION=3.2
+      COSMO_VERSION=3.9.6
       COSMO_CC=".cosmocc/${COSMO_VERSION}"
 
       if COSMO_CC_COMPILER="`command -v cosmocc`"
@@ -350,9 +351,10 @@ install_main()
    logging_tee_eval_exekutor "${LOGFILE}" "${TEEFILE}" \
       cp "${KITCHEN_DIR}/o/${mode}/ape/ape.lds" "${PREFIX}/lib/ape.lds" || exit 1
 
-#if ! OLD_COSMOPOLITAN
-   cp -Ra "${KITCHEN_DIR}/o/${mode}/include" "${PREFIX}"
-#else
+   if [ "${OLD_COSMOPOLITAN:-NO}" = 'NO' ]
+   then
+      cp -Ra "${KITCHEN_DIR}/o/${mode}/include" "${PREFIX}"
+   else
    # create a lot of symlinks to lib/cosmopolitan.h for C std libraries
    (
       set -e
@@ -417,7 +419,7 @@ EOF
 EOF
       done
    ) || exit 1
-#endif
+   fi
 
    mkdir_if_missing "${PREFIX}/lib"
 
