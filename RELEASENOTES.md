@@ -1,3 +1,7 @@
+### 0.0.5
+
+* downloads ok, but doesnt build anymore. will try to fix on request
+
 ### 0.0.4
 
 * support for cosmopolitan 3.2.4
